@@ -1,0 +1,41 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1780180073501,
+      "tag": "0000_kind_bloodstorm",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1780189081116,
+      "tag": "0001_even_mongoose",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1780189655925,
+      "tag": "0002_goofy_elektra",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1748736000000,
+      "tag": "0003_season_ranking",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1780586936439,
+      "tag": "0004_woozy_satana",
+      "breakpoints": true
+    }
+  ]
+}

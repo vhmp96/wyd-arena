@@ -1,0 +1,19 @@
+{
+  "name": "wyd-global-arena",
+  "private": true,
+  "version": "0.0.1",
+  "scripts": {
+    "dev": "pnpm --parallel --filter ./apps/* dev",
+    "build": "pnpm --filter './packages/*' build && pnpm --filter './apps/*' build",
+    "lint": "pnpm --recursive lint",
+    "start": "pnpm db:migrate && pnpm --filter @wyd/api start",
+    "db:generate": "pnpm --filter @wyd/db db:generate",
+    "db:migrate": "pnpm --filter @wyd/db db:migrate",
+    "db:seed": "pnpm --filter @wyd/db db:seed",
+    "test": "pnpm --filter @wyd/api test"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "@netlify/functions": "^3.0.0"
+  }
+}

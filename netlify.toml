@@ -1,0 +1,24 @@
+# Configuração do Netlify pro monorepo inteiro (frontend + backend) rodando
+# num site só. O frontend (apps/web) é build normal do Vite; a API e as
+# sincronizações automáticas rodam como Netlify Functions (pasta netlify/functions).
+
+[build]
+  # Roda a migração do banco (cria/atualiza as tabelas) antes de tudo, depois
+  # builda os pacotes compartilhados e por fim o frontend. A migração é segura
+  # de rodar toda vez — ela só aplica o que ainda não foi aplicado antes.
+  command = "pnpm install && pnpm db:migrate && pnpm --filter './packages/*' build && pnpm --filter @wyd/web build"
+  publish = "apps/web/dist"
+  functions = "netlify/functions"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# A rota /api/* já é servida diretamente pela função (veja o "path" configurado
+# dentro de netlify/functions/api.ts) — não precisa de redirect explícito aqui.
+
+# Qualquer outra rota cai no index.html (o React Router cuida do resto) —
+# padrão de single-page-application.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
