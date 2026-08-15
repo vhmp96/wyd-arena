@@ -1,4 +1,4 @@
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc, inArray } from 'drizzle-orm';
 import type { Db } from '@wyd/db';
 import { player, arena, arenaPlayerResult, snapshot, playerSnapshot, rawSnapshot, syncExecution } from '@wyd/db';
 import type { RankingsResponse } from '@wyd/shared';
@@ -55,18 +55,24 @@ export class SyncService {
       const uniqueNames = [...new Set(allEntries.map((p) => p.charName))];
       const playerMap = new Map<string, string>();
 
-      for (const name of uniqueNames) {
-        const [existingPlayer] = await this.db.select().from(player).where(eq(player.name, name)).limit(1);
-        if (existingPlayer) {
-          playerMap.set(name, existingPlayer.id);
-        } else {
+      // Antes: 1 ida-e-volta pro banco POR JOGADOR (podia passar de 100 idas-e-voltas
+      // sequenciais). Isso sozinho estourava os 30s de limite que as Scheduled Functions
+      // do Netlify têm (e não dá pra aumentar) — a sincronização morria no meio, sem
+      // nunca marcar sucesso nem erro, ficando travada em "RUNNING" pra sempre.
+      // Agora: 1 consulta pra ver quem já existe + 1 inserção só pros que faltam.
+      const existingPlayers = uniqueNames.length > 0
+        ? await this.db.select().from(player).where(inArray(player.name, uniqueNames))
+        : [];
+      for (const p of existingPlayers) playerMap.set(p.name, p.id);
+
+      const nomesNovos = uniqueNames.filter((name) => !playerMap.has(name));
+      if (nomesNovos.length > 0) {
+        const novosJogadores = nomesNovos.map((name) => {
           const info = allEntries.find((p) => p.charName === name)!;
-          const [inserted] = await this.db
-            .insert(player)
-            .values({ name, class: info.class, subClass: info.subClass })
-            .returning();
-          playerMap.set(name, inserted.id);
-        }
+          return { name, class: info.class, subClass: info.subClass };
+        });
+        const inseridos = await this.db.insert(player).values(novosJogadores).returning();
+        for (const p of inseridos) playerMap.set(p.name, p.id);
       }
 
       // save playerSnapshot (cumulative totals)
