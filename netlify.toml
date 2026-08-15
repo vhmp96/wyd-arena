@@ -3,12 +3,17 @@
 # sincronizações automáticas rodam como Netlify Functions (pasta netlify/functions).
 
 [build]
-  # Roda a migração do banco (cria/atualiza as tabelas) antes de tudo, depois
-  # builda os pacotes compartilhados e por fim o frontend. A migração é segura
-  # de rodar toda vez — ela só aplica o que ainda não foi aplicado antes.
-  command = "pnpm install && pnpm db:migrate && pnpm --filter './packages/*' build && pnpm --filter @wyd/web build"
+  # Roda a migração do banco (cria/atualiza as tabelas), builda os pacotes
+  # compartilhados, o frontend, e por fim PRÉ-EMPACOTA cada Netlify Function com
+  # esbuild antes de entregar pro Netlify processar. Isso é necessário porque o
+  # empacotador automático do Netlify (zip-it-and-ship-it) tem um bug/limitação
+  # não resolvida com imports relativos que "saem" da pasta netlify/functions
+  # (nosso caso, que importa de apps/api/) combinados com a estrutura do pnpm —
+  # ele gera um arquivo incompleto sem avisar erro nenhum. Pré-empacotar do lado
+  # de fora evita esse problema por completo.
+  command = "pnpm install && pnpm db:migrate && pnpm --filter './packages/*' build && pnpm --filter @wyd/web build && pnpm dlx esbuild@0.24.0 netlify/functions/api.ts netlify/functions/scheduled-sync-1.ts netlify/functions/scheduled-sync-2.ts netlify/functions/scheduled-sync-3.ts netlify/functions/scheduled-sync-4.ts netlify/functions/scheduled-level-sync.ts netlify/functions/scheduled-season-consolidate.ts --bundle --platform=node --format=esm --outdir=netlify/functions-built --out-extension:.js=.mjs"
   publish = "apps/web/dist"
-  functions = "netlify/functions"
+  functions = "netlify/functions-built"
 
 [build.environment]
   NODE_VERSION = "20"
