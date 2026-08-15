@@ -12,6 +12,13 @@
     "db:seed": "pnpm --filter @wyd/db db:seed",
     "test": "pnpm --filter @wyd/api test"
   },
+  "dependencies": {
+    "hono": "^4.6.14",
+    "drizzle-orm": "^0.39.1",
+    "postgres": "^3.4.5",
+    "@wyd/db": "workspace:*",
+    "@wyd/shared": "workspace:*"
+  },
   "devDependencies": {
     "typescript": "^5.7.2",
     "@netlify/functions": "^3.0.0"
