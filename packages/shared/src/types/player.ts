@@ -19,7 +19,7 @@ export interface RankingPlayer {
   points: number;
   bonusKill: number;
   total: number;
-  lastArena?: { killsDelta: number; deathsDelta: number; arenaDate: string; arenaNumber: number };
+  lastArena?: { killsDelta: number; deathsDelta: number; winner: boolean; arenaDate: string; arenaNumber: number };
 }
 
 export interface RankingsResponse {

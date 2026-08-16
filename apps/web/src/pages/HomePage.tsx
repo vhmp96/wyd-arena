@@ -303,7 +303,10 @@ function LastWinnersSidebar({ division }: { division: ArenaDiv }) {
 
   const label = division === 'champion' ? 'Champion' : 'Aspirant';
 
-  const winners = (division === 'champion' ? rankings?.champion : rankings?.aspirant)
+  // Antes só vinha quem tinha vencido — agora vem todo mundo que participou da
+  // última arena (o backend já não filtra mais por vencedor). O campo "winner"
+  // continua disponível pra destacar quem de fato ganhou dentro da lista geral.
+  const participantes = (division === 'champion' ? rankings?.champion : rankings?.aspirant)
     ?.filter((p) => p.lastArena)
     .sort((a, b) => (b.lastArena?.killsDelta ?? 0) - (a.lastArena?.killsDelta ?? 0))
     ?? [];
@@ -313,10 +316,10 @@ function LastWinnersSidebar({ division }: { division: ArenaDiv }) {
   return (
     <div className="rounded-lg border bg-card p-3 space-y-2">
       <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-        Última Arena {label}
+        Última Arena {label} <span className="normal-case font-normal">(geral)</span>
       </p>
-      {winners.length === 0 ? (
-        <p className="text-xs text-muted-foreground text-center py-2">Nenhum vencedor recente</p>
+      {participantes.length === 0 ? (
+        <p className="text-xs text-muted-foreground text-center py-2">Nenhum resultado recente</p>
       ) : (
         <table className="w-full text-xs">
           <thead>
@@ -327,12 +330,15 @@ function LastWinnersSidebar({ division }: { division: ArenaDiv }) {
             </tr>
           </thead>
           <tbody>
-            {winners.map((p) => {
+            {participantes.map((p) => {
               const lvl = levelMap.get(p.charName);
               return (
                 <tr key={p.charName} className="border-b border-border/40 last:border-0">
                   <td className="py-1 pr-1">
                     <div className="flex items-center gap-1">
+                      {p.lastArena?.winner && (
+                        <span title="Venceu essa arena" className="shrink-0">🏆</span>
+                      )}
                       {lvl?.kingdom && (
                         <span className={`inline-block h-2 w-2 rounded-full shrink-0 ${lvl.kingdom === 'blue' ? 'bg-blue-500' : 'bg-red-500'}`} />
                       )}

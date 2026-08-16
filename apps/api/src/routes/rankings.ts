@@ -1,10 +1,10 @@
 import { Hono } from 'hono';
-import { desc, eq, and } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 import type { Db } from '@wyd/db';
 import { arena, arenaPlayerResult, player, snapshot, rawSnapshot } from '@wyd/db';
 import type { RankingsResponse } from '@wyd/shared';
 
-async function getLastArenaDeltas(db: Db, division: 'champion' | 'aspirant'): Promise<Map<string, { killsDelta: number; deathsDelta: number; arenaDate: string; arenaNumber: number }>> {
+async function getLastArenaDeltas(db: Db, division: 'champion' | 'aspirant'): Promise<Map<string, { killsDelta: number; deathsDelta: number; winner: boolean; arenaDate: string; arenaNumber: number }>> {
   const [lastArena] = await db
     .select()
     .from(arena)
@@ -14,18 +14,22 @@ async function getLastArenaDeltas(db: Db, division: 'champion' | 'aspirant'): Pr
 
   if (!lastArena) return new Map();
 
+  // Antes: só trazia quem tinha "winner = true" — agora traz todo mundo que
+  // participou daquela arena (o campo "winner" continua vindo junto, pra tela
+  // poder destacar quem de fato venceu sem esconder o resto).
   const results = await db
     .select({
       charName: player.name,
       killsDelta: arenaPlayerResult.killsDelta,
       deathsDelta: arenaPlayerResult.deathsDelta,
+      winner: arenaPlayerResult.winner,
     })
     .from(arenaPlayerResult)
     .innerJoin(player, eq(arenaPlayerResult.playerId, player.id))
-    .where(and(eq(arenaPlayerResult.arenaId, lastArena.id), eq(arenaPlayerResult.winner, true)));
+    .where(eq(arenaPlayerResult.arenaId, lastArena.id));
 
   return new Map(
-    results.map((r) => [r.charName, { killsDelta: r.killsDelta, deathsDelta: r.deathsDelta, arenaDate: lastArena.arenaDate, arenaNumber: lastArena.arenaNumber }])
+    results.map((r) => [r.charName, { killsDelta: r.killsDelta, deathsDelta: r.deathsDelta, winner: r.winner, arenaDate: lastArena.arenaDate, arenaNumber: lastArena.arenaNumber }])
   );
 }
 

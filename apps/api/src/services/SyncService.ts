@@ -210,9 +210,31 @@ export class SyncService {
       const isFirstArena = checkSeasonReset(currRows, prevMap);
       if (isFirstArena) seasonReset = true;
 
+      // Antes: só quem "venceu" (winsTotal aumentou) era salvo — todo mundo que só
+      // participou (kills/deaths sem vitória contabilizada) nunca aparecia em lugar
+      // nenhum. Agora: guarda TODO MUNDO da divisão, cada um com o campo "winner"
+      // marcando quem de fato venceu — dá pra mostrar tanto "só vencedores" quanto
+      // "geral" na tela, sem perder dado nenhum.
       const winners = detectWinners(currRows, prevMap, isFirstArena);
+      const winnersIds = new Set(winners.map((w) => w.playerId));
 
-      if (winners.length === 0) continue;
+      const zeroPrev = (playerId: string) => ({
+        playerId, winsTotal: 0, killsTotal: 0, deathsTotal: 0, pointsTotal: 0,
+      });
+
+      // Calcula o delta de todo mundo ANTES de decidir se cria a arena — assim dá
+      // pra checar se teve atividade de verdade (kill/death/vitória mudou pra
+      // alguém), não só "tinha gente no snapshot" (o que aconteceria mesmo sem
+      // nenhuma guerra real ter rolado entre as duas capturas).
+      const resultados = currRows.map((cur) => ({
+        arenaId: '', // preenchido depois de criar/achar a arena
+        playerId: cur.playerId,
+        winner: winnersIds.has(cur.playerId),
+        ...calcDelta(cur, isFirstArena || !prevMap.has(cur.playerId) ? zeroPrev(cur.playerId) : prevMap.get(cur.playerId)!),
+      }));
+
+      const houveAtividade = resultados.some((r) => r.killsDelta > 0 || r.deathsDelta > 0 || r.winsDelta > 0);
+      if (!houveAtividade) continue;
 
       const [existing] = await this.db
         .select()
@@ -234,17 +256,8 @@ export class SyncService {
         created++;
       }
 
-      const zeroPrev = (playerId: string) => ({
-        playerId, winsTotal: 0, killsTotal: 0, deathsTotal: 0, pointsTotal: 0,
-      });
-
       await this.db.insert(arenaPlayerResult).values(
-        winners.map((cur) => ({
-          arenaId,
-          playerId: cur.playerId,
-          winner: true,
-          ...calcDelta(cur, isFirstArena || !prevMap.has(cur.playerId) ? zeroPrev(cur.playerId) : prevMap.get(cur.playerId)!),
-        })),
+        resultados.map((r) => ({ ...r, arenaId })),
       );
     }
 

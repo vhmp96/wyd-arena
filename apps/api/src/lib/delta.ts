@@ -7,7 +7,7 @@ export interface SnapshotRow {
 }
 
 export interface WinnerDelta {
-  winsDelta: 1;
+  winsDelta: number;
   killsDelta: number;
   deathsDelta: number;
   pointsDelta: number;
@@ -37,7 +37,7 @@ export function detectWinners(
 
 export function calcDelta(cur: SnapshotRow, prev: SnapshotRow): WinnerDelta {
   return {
-    winsDelta: 1,
+    winsDelta: Math.max(0, cur.winsTotal - prev.winsTotal),
     killsDelta: Math.max(0, cur.killsTotal - prev.killsTotal),
     deathsDelta: Math.max(0, cur.deathsTotal - prev.deathsTotal),
     pointsDelta: Math.max(0, cur.pointsTotal - prev.pointsTotal),
