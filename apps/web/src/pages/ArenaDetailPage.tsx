@@ -52,7 +52,7 @@ export function ArenaDetailPage() {
           <div className="space-y-6">
             <div className="rounded-lg border bg-card p-6">
               <h2 className="mb-4 text-lg font-semibold">Detalhes da Arena</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Data</p>
                   <p className="font-medium">{fmtDate(data.arenaDate)}</p>
@@ -66,6 +66,10 @@ export function ArenaDetailPage() {
                   <Badge variant="outline" className="mt-0.5">
                     {DIVISION_LABELS[data.division] ?? data.division}
                   </Badge>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Campeões 🏆</p>
+                  <p className="font-medium">{data.winnerCount}</p>
                 </div>
               </div>
             </div>
@@ -91,16 +95,21 @@ export function ArenaDetailPage() {
                       </TableCell>
                     </TableRow>
                   )}
-                  {data.players.map((p) => (
-                    <TableRow key={p.id}>
+                  {[...data.players]
+                    .sort((a, b) => (b.winner ? 1 : 0) - (a.winner ? 1 : 0) || b.killsDelta - a.killsDelta)
+                    .map((p) => (
+                    <TableRow key={p.id} className={p.winner ? 'bg-primary/5' : undefined}>
                       <TableCell className="font-medium">
-                        <Link
-                          to="/"
-                          search={{ q: p.playerName }}
-                          className="hover:underline hover:text-primary"
-                        >
-                          {p.playerName}
-                        </Link>
+                        <div className="flex items-center gap-1.5">
+                          {p.winner && <span title="Campeão dessa arena">🏆</span>}
+                          <Link
+                            to="/"
+                            search={{ q: p.playerName }}
+                            className="hover:underline hover:text-primary"
+                          >
+                            {p.playerName}
+                          </Link>
+                        </div>
                       </TableCell>
                       <TableCell className="text-center">{p.killsDelta}</TableCell>
                       <TableCell className="text-center">{p.deathsDelta}</TableCell>
