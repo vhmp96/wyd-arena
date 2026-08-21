@@ -1,4 +1,4 @@
-import { eq, and, desc, inArray } from 'drizzle-orm';
+import { eq, and, desc, inArray, ne } from 'drizzle-orm';
 import type { Db } from '@wyd/db';
 import { player, arena, arenaPlayerResult, snapshot, playerSnapshot, rawSnapshot, syncExecution } from '@wyd/db';
 import type { RankingsResponse } from '@wyd/shared';
@@ -221,6 +221,45 @@ export class SyncService {
       const zeroPrev = (playerId: string) => ({
         playerId, winsTotal: 0, killsTotal: 0, deathsTotal: 0, pointsTotal: 0,
       });
+
+      // A API do jogo parece devolver só um "top N" — quem cai fora dessa lista por
+      // 1 sincronização (mesmo sem ter parado de jogar) e volta depois ficava sem
+      // registro no snapshot ANTERIOR imediato, e caía no "zeroPrev" — mostrando o
+      // total acumulado inteiro (tipo 130 kills) como se fosse só dessa arena. Pra
+      // corrigir, busca o snapshot mais recente de verdade da pessoa (não só o
+      // imediatamente anterior) antes de assumir "começou do zero".
+      const faltantes = currRows.filter((cur) => !prevMap.has(cur.playerId)).map((cur) => cur.playerId);
+      if (!isFirstArena && faltantes.length > 0) {
+        const historico = await this.db
+          .select({
+            playerId: playerSnapshot.playerId,
+            winsTotal: playerSnapshot.winsTotal,
+            killsTotal: playerSnapshot.killsTotal,
+            deathsTotal: playerSnapshot.deathsTotal,
+            pointsTotal: playerSnapshot.pointsTotal,
+            collectedAt: snapshot.collectedAt,
+          })
+          .from(playerSnapshot)
+          .innerJoin(snapshot, eq(playerSnapshot.snapshotId, snapshot.id))
+          .where(and(
+            inArray(playerSnapshot.playerId, faltantes),
+            eq(playerSnapshot.division, div),
+            ne(snapshot.id, snapId),
+          ))
+          .orderBy(desc(snapshot.collectedAt));
+
+        // historico já vem ordenado do mais recente pro mais antigo — guarda só a
+        // primeira ocorrência de cada jogador (que é a mais recente de verdade).
+        for (const h of historico) {
+          if (!prevMap.has(h.playerId)) {
+            prevMap.set(h.playerId, {
+              id: '', snapshotId: '', division: div,
+              playerId: h.playerId, winsTotal: h.winsTotal, killsTotal: h.killsTotal,
+              deathsTotal: h.deathsTotal, pointsTotal: h.pointsTotal,
+            });
+          }
+        }
+      }
 
       // Calcula o delta de todo mundo ANTES de decidir se cria a arena — assim dá
       // pra checar se teve atividade de verdade (kill/death/vitória mudou pra
