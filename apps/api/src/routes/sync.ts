@@ -15,6 +15,11 @@ export function createSyncRoutes(syncService: SyncService) {
     return c.json(result, result.ok ? 200 : 500);
   });
 
+  app.post('/recompute-history', requireAuth, async (c) => {
+    const result = await syncService.recomputeAllHistory();
+    return c.json(result, result.ok ? 200 : 500);
+  });
+
   app.get('/status', async (c) => {
     const last = await syncService.lastSync();
     return c.json({ last });

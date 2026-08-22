@@ -113,6 +113,12 @@ export const syncApi = {
       headers: { Authorization: `Bearer ${getToken()}` },
     }).then((r) => r.json());
   },
+  recomputeHistory(): Promise<{ ok: boolean; message: string; created: number; updated: number }> {
+    return fetch(`${BASE_URL}/sync/recompute-history`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${getToken()}` },
+    }).then((r) => r.json());
+  },
   status(): Promise<SyncStatus> {
     return fetchJson(`${BASE_URL}/sync/status`);
   },

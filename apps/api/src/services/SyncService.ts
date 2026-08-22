@@ -195,9 +195,10 @@ export class SyncService {
     prevSnapId: string,
     arenaDate: string,
     arenaNumber: number,
-  ): Promise<{ created: number; seasonReset: boolean }> {
+  ): Promise<{ created: number; updated: number; seasonReset: boolean }> {
     const divisions = ['champion', 'aspirant'] as const;
     let created = 0;
+    let updated = 0;
     let seasonReset = false;
 
     for (const div of divisions) {
@@ -210,24 +211,14 @@ export class SyncService {
       const isFirstArena = checkSeasonReset(currRows, prevMap);
       if (isFirstArena) seasonReset = true;
 
-      // Antes: só quem "venceu" (winsTotal aumentou) era salvo — todo mundo que só
-      // participou (kills/deaths sem vitória contabilizada) nunca aparecia em lugar
-      // nenhum. Agora: guarda TODO MUNDO da divisão, cada um com o campo "winner"
-      // marcando quem de fato venceu — dá pra mostrar tanto "só vencedores" quanto
-      // "geral" na tela, sem perder dado nenhum.
-      const winners = detectWinners(currRows, prevMap, isFirstArena);
-      const winnersIds = new Set(winners.map((w) => w.playerId));
-
-      const zeroPrev = (playerId: string) => ({
-        playerId, winsTotal: 0, killsTotal: 0, deathsTotal: 0, pointsTotal: 0,
-      });
-
       // A API do jogo parece devolver só um "top N" — quem cai fora dessa lista por
       // 1 sincronização (mesmo sem ter parado de jogar) e volta depois ficava sem
       // registro no snapshot ANTERIOR imediato, e caía no "zeroPrev" — mostrando o
       // total acumulado inteiro (tipo 130 kills) como se fosse só dessa arena. Pra
       // corrigir, busca o snapshot mais recente de verdade da pessoa (não só o
-      // imediatamente anterior) antes de assumir "começou do zero".
+      // imediatamente anterior) antes de assumir "começou do zero". Isso precisa
+      // rodar ANTES de decidir quem venceu (detectWinners logo abaixo) — senão a
+      // detecção de vencedor ainda usava a versão incompleta, e o troféu sumia.
       const faltantes = currRows.filter((cur) => !prevMap.has(cur.playerId)).map((cur) => cur.playerId);
       if (!isFirstArena && faltantes.length > 0) {
         const historico = await this.db
@@ -261,6 +252,18 @@ export class SyncService {
         }
       }
 
+      // Antes: só quem "venceu" (winsTotal aumentou) era salvo — todo mundo que só
+      // participou (kills/deaths sem vitória contabilizada) nunca aparecia em lugar
+      // nenhum. Agora: guarda TODO MUNDO da divisão, cada um com o campo "winner"
+      // marcando quem de fato venceu — dá pra mostrar tanto "só vencedores" quanto
+      // "geral" na tela, sem perder dado nenhum.
+      const winners = detectWinners(currRows, prevMap, isFirstArena);
+      const winnersIds = new Set(winners.map((w) => w.playerId));
+
+      const zeroPrev = (playerId: string) => ({
+        playerId, winsTotal: 0, killsTotal: 0, deathsTotal: 0, pointsTotal: 0,
+      });
+
       // Calcula o delta de todo mundo ANTES de decidir se cria a arena — assim dá
       // pra checar se teve atividade de verdade (kill/death/vitória mudou pra
       // alguém), não só "tinha gente no snapshot" (o que aconteceria mesmo sem
@@ -286,6 +289,7 @@ export class SyncService {
         arenaId = existing.id;
         await this.db.delete(arenaPlayerResult).where(eq(arenaPlayerResult.arenaId, arenaId));
         await this.db.update(arena).set({ winnerCount: winners.length }).where(eq(arena.id, arenaId));
+        updated++;
       } else {
         const [newArena] = await this.db
           .insert(arena)
@@ -300,6 +304,33 @@ export class SyncService {
       );
     }
 
-    return { created, seasonReset };
+    return { created, updated, seasonReset };
+  }
+
+  // Recalcula TODO o histórico de arenas a partir dos snapshots que já existem no
+  // banco, usando a lógica corrigida de detecção de vencedor e cálculo de delta.
+  // Não precisa esperar sincronizações novas — o dado bruto já está salvo, só a
+  // conta que tava errada. Reaproveita o mesmo processDelta usado nas sincronizações
+  // normais, só que percorrendo TODOS os pares de snapshots consecutivos, não só o
+  // mais novo com o imediatamente anterior.
+  async recomputeAllHistory(): Promise<{ ok: boolean; message: string; created: number; updated: number }> {
+    const allSnapshots = await this.db.select().from(snapshot).orderBy(snapshot.collectedAt);
+
+    let totalCreated = 0;
+    let totalUpdated = 0;
+    for (let i = 1; i < allSnapshots.length; i++) {
+      const prev = allSnapshots[i - 1];
+      const curr = allSnapshots[i];
+      const { created, updated } = await this.processDelta(curr.id, prev.id, curr.arenaDate, curr.arenaNumber);
+      totalCreated += created;
+      totalUpdated += updated;
+    }
+
+    return {
+      ok: true,
+      message: `${totalCreated} arena(s) nova(s), ${totalUpdated} recalculada(s), a partir de ${allSnapshots.length} snapshot(s)`,
+      created: totalCreated,
+      updated: totalUpdated,
+    };
   }
 }

@@ -288,6 +288,7 @@ function SnapshotManager() {
 function AdminPanel({ onLogout }: { onLogout: () => void }) {
   const [syncing, setSyncing] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [recomputing, setRecomputing] = useState(false);
   const [feedback, setFeedback] = useState<{ ok: boolean; message: string } | null>(null);
   const queryClient = useQueryClient();
 
@@ -319,6 +320,16 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
     setResetting(false);
     await refetch();
     await queryClient.invalidateQueries();
+  }
+
+  async function handleRecomputeHistory() {
+    setRecomputing(true);
+    setFeedback(null);
+    const result = await syncApi.recomputeHistory();
+    setFeedback(result);
+    setRecomputing(false);
+    await queryClient.invalidateQueries({ queryKey: ['arenas'] });
+    await queryClient.invalidateQueries({ queryKey: ['rankings'] });
   }
 
   return (
@@ -365,6 +376,22 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
           <div className="text-xs text-muted-foreground space-y-0.5">
             <p>Crons automáticos: <span className="font-mono">13:35 · 19:35 · 21:05 · 23:35</span></p>
           </div>
+        </div>
+
+        {/* Recompute history card */}
+        <div className="rounded-lg border bg-card p-6 space-y-4">
+          <h2 className="font-semibold">Recalcular Histórico</h2>
+          <p className="text-sm text-muted-foreground">
+            Refaz o cálculo de vencedores e kills/deaths de TODAS as arenas já sincronizadas, usando as correções mais recentes — sem precisar esperar sincronizações novas. Útil depois de uma atualização que corrige a lógica de cálculo.
+          </p>
+          <button
+            onClick={handleRecomputeHistory}
+            disabled={recomputing}
+            className="inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent disabled:opacity-50"
+          >
+            <RefreshCw className={`h-4 w-4 ${recomputing ? 'animate-spin' : ''}`} />
+            {recomputing ? 'Recalculando...' : 'Recalcular histórico agora'}
+          </button>
         </div>
 
         {/* Reset card */}
