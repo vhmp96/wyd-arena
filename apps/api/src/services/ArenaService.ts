@@ -79,6 +79,45 @@ export class ArenaService {
     return deleted.length > 0;
   }
 
+  // Busca os campeões (vencedores) de uma data + horário de arena específicos,
+  // nas duas divisões de uma vez — usado na aba "Campeões" da busca retroativa,
+  // pra não precisar entrar em cada arena separadamente só pra ver quem ganhou.
+  async getChampions(arenaDate: string, arenaNumber: number) {
+    const divisions = ['champion', 'aspirant'] as const;
+    const resultado: Record<string, { arenaId: string | null; winners: { playerName: string; killsDelta: number; deathsDelta: number }[] }> = {};
+
+    for (const div of divisions) {
+      const [arenaRow] = await this.db
+        .select()
+        .from(arena)
+        .where(and(eq(arena.arenaDate, arenaDate), eq(arena.arenaNumber, arenaNumber), eq(arena.division, div)))
+        .limit(1);
+
+      if (!arenaRow) {
+        resultado[div] = { arenaId: null, winners: [] };
+        continue;
+      }
+
+      const winners = await this.db
+        .select({
+          playerName: player.name,
+          killsDelta: arenaPlayerResult.killsDelta,
+          deathsDelta: arenaPlayerResult.deathsDelta,
+        })
+        .from(arenaPlayerResult)
+        .innerJoin(player, eq(arenaPlayerResult.playerId, player.id))
+        .where(and(eq(arenaPlayerResult.arenaId, arenaRow.id), eq(arenaPlayerResult.winner, true)))
+        .orderBy(desc(arenaPlayerResult.killsDelta));
+
+      resultado[div] = { arenaId: arenaRow.id, winners };
+    }
+
+    return resultado as {
+      champion: { arenaId: string | null; winners: { playerName: string; killsDelta: number; deathsDelta: number }[] };
+      aspirant: { arenaId: string | null; winners: { playerName: string; killsDelta: number; deathsDelta: number }[] };
+    };
+  }
+
   async getArena(id: string): Promise<GetArenaResponseDto | null> {
     const [arenaRow] = await this.db.select().from(arena).where(eq(arena.id, id));
     if (!arenaRow) return null;

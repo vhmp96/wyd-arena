@@ -20,6 +20,17 @@ export function createArenaRoutes(arenaService: ArenaService) {
     return c.json({ data });
   });
 
+  app.get('/champions', async (c) => {
+    const arenaDate = c.req.query('arenaDate');
+    const arenaNumberRaw = c.req.query('arenaNumber');
+    const arenaNumber = arenaNumberRaw ? parseInt(arenaNumberRaw, 10) : NaN;
+    if (!arenaDate || Number.isNaN(arenaNumber) || arenaNumber < 1 || arenaNumber > 4) {
+      return c.json({ error: 'arenaDate e arenaNumber (1 a 4) são obrigatórios' }, 400);
+    }
+    const data = await arenaService.getChampions(arenaDate, arenaNumber);
+    return c.json(data);
+  });
+
   app.get('/:id', async (c) => {
     const id = c.req.param('id');
     const data = await arenaService.getArena(id);

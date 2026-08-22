@@ -134,6 +134,116 @@ function ArenaDetailModal({ arenaId, open, onClose }: { arenaId: string; open: b
   );
 }
 
+function ChampionsSearch() {
+  const [dateInput, setDateInput] = useState('');
+  const [numberInput, setNumberInput] = useState('');
+  const [searchKey, setSearchKey] = useState<{ date: string; number: number } | null>(null);
+
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['champions', searchKey],
+    queryFn: () => arenaApi.getChampions(searchKey!.date, searchKey!.number),
+    enabled: !!searchKey,
+  });
+
+  function handleSearch() {
+    if (!dateInput || !numberInput) return;
+    setSearchKey({ date: dateInput, number: Number(numberInput) });
+  }
+
+  const divisions: { key: 'champion' | 'aspirant'; label: string }[] = [
+    { key: 'champion', label: 'Champion' },
+    { key: 'aspirant', label: 'Aspirant' },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-lg border bg-card p-4 space-y-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+          <div className="flex-1 space-y-1">
+            <Label>Data</Label>
+            <DatePicker value={dateInput} onChange={setDateInput} />
+          </div>
+          <div className="w-full sm:w-44 space-y-1">
+            <Label htmlFor="arenaNumber-champions">Arena</Label>
+            <select
+              id="arenaNumber-champions"
+              value={numberInput}
+              onChange={(e) => setNumberInput(e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <option value="">Selecione</option>
+              {Object.entries(ARENA_TIME_LABELS).map(([num, label]) => (
+                <option key={num} value={num}>{label}</option>
+              ))}
+            </select>
+          </div>
+          <Button onClick={handleSearch} disabled={!dateInput || !numberInput} className="gap-2">
+            <Search className="h-4 w-4" />
+            Ver Campeões
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Escolhe uma data e um horário de arena específicos pra ver quem venceu naquele dia — nas duas divisões, sem precisar entrar em cada arena separadamente.
+        </p>
+      </div>
+
+      {!searchKey && (
+        <p className="py-10 text-center text-muted-foreground">Escolhe uma data e um horário acima pra ver os campeões.</p>
+      )}
+      {searchKey && isLoading && <p className="py-10 text-center text-muted-foreground">Carregando...</p>}
+      {searchKey && isError && <p className="py-10 text-center text-destructive">Erro ao carregar. Verifique se a API está rodando.</p>}
+
+      {searchKey && data && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {divisions.map(({ key, label }) => {
+            const info = data[key];
+            return (
+              <div key={key} className="rounded-lg border bg-card">
+                <div className="border-b px-4 py-3">
+                  <h3 className="font-semibold">{label}</h3>
+                </div>
+                <div className="p-4">
+                  {!info.arenaId ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">Nenhuma arena {label} encontrada nesse dia/horário.</p>
+                  ) : info.winners.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">Essa arena não teve campeão registrado.</p>
+                  ) : (
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="text-muted-foreground border-b border-border">
+                          <th className="text-left pb-2 font-medium">Nome</th>
+                          <th className="text-center pb-2 font-medium w-14">Kills</th>
+                          <th className="text-center pb-2 font-medium w-16">Deaths</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {info.winners.map((w) => (
+                          <tr key={w.playerName} className="border-b border-border/40 last:border-0">
+                            <td className="py-2 pr-2">
+                              <div className="flex items-center gap-1.5">
+                                <span>🏆</span>
+                                <Link to="/" search={{ q: w.playerName }} className="font-medium hover:underline hover:text-primary">
+                                  {w.playerName}
+                                </Link>
+                              </div>
+                            </td>
+                            <td className="py-2 text-center tabular-nums text-primary">{w.killsDelta}</td>
+                            <td className="py-2 text-center tabular-nums text-muted-foreground">{w.deathsDelta}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ArenaTable({ division, winnerOptions }: { division: ArenaDiv; winnerOptions: string[] }) {
   const [dateInput, setDateInput] = useState('');
   const [numberInput, setNumberInput] = useState('');
@@ -390,6 +500,7 @@ export function HomePage() {
             <TabsList>
               <TabsTrigger value="champion">Champion</TabsTrigger>
               <TabsTrigger value="aspirant">Aspirant</TabsTrigger>
+              <TabsTrigger value="campeoes">🏆 Campeões</TabsTrigger>
             </TabsList>
             <TabsContent value="champion">
               <ArenaTable division="champion" winnerOptions={championWinners} />
@@ -397,10 +508,13 @@ export function HomePage() {
             <TabsContent value="aspirant">
               <ArenaTable division="aspirant" winnerOptions={aspirantWinners} />
             </TabsContent>
+            <TabsContent value="campeoes">
+              <ChampionsSearch />
+            </TabsContent>
           </Tabs>
         </div>
         <div className="sm:col-span-1 sm:pt-10">
-          <LastWinnersSidebar division={tab as ArenaDiv} />
+          {tab !== 'campeoes' && <LastWinnersSidebar division={tab as ArenaDiv} />}
         </div>
       </div>
     </Layout>

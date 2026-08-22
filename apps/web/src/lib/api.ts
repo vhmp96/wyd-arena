@@ -40,6 +40,12 @@ export const arenaApi = {
   get(id: string): Promise<GetArenaResponseDto> {
     return fetchJson(`${BASE_URL}/arenas/${id}`);
   },
+  getChampions(arenaDate: string, arenaNumber: number): Promise<{
+    champion: { arenaId: string | null; winners: { playerName: string; killsDelta: number; deathsDelta: number }[] };
+    aspirant: { arenaId: string | null; winners: { playerName: string; killsDelta: number; deathsDelta: number }[] };
+  }> {
+    return fetchJson(`${BASE_URL}/arenas/champions?arenaDate=${arenaDate}&arenaNumber=${arenaNumber}`);
+  },
   async delete(id: string): Promise<{ ok: boolean; error?: string }> {
     const r = await fetch(`${BASE_URL}/arenas/${id}`, {
       method: 'DELETE',
@@ -113,8 +119,11 @@ export const syncApi = {
       headers: { Authorization: `Bearer ${getToken()}` },
     }).then((r) => r.json());
   },
-  recomputeHistory(): Promise<{ ok: boolean; message: string; created: number; updated: number }> {
-    return fetch(`${BASE_URL}/sync/recompute-history`, {
+  recomputeHistory(offset = 0, batchSize = 4): Promise<{
+    ok: boolean; message: string; created: number; updated: number;
+    processedUpTo: number; total: number; done: boolean;
+  }> {
+    return fetch(`${BASE_URL}/sync/recompute-history?offset=${offset}&batchSize=${batchSize}`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${getToken()}` },
     }).then((r) => r.json());
